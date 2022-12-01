@@ -1,22 +1,22 @@
 #include "lcd.h"
 #include "PWM.h"
-// количество точек дисплея в буфере
+// РєРѕР»РёС‡РµСЃС‚РІРѕ С‚РѕС‡РµРє РґРёСЃРїР»РµСЏ РІ Р±СѓС„РµСЂРµ
 #define DMA_BUFFER_POINTS 75
 
-//размер буферов для ДМА
-//размер одной точки буфера ДМА
-#define OP_SIZE					4//OnePoint size(две посылки 8бит + две команды)
-//размер буфера для отрисовки
+//СЂР°Р·РјРµСЂ Р±СѓС„РµСЂРѕРІ РґР»СЏ Р”РњРђ
+//СЂР°Р·РјРµСЂ РѕРґРЅРѕР№ С‚РѕС‡РєРё Р±СѓС„РµСЂР° Р”РњРђ
+#define OP_SIZE					4//OnePoint size(РґРІРµ РїРѕСЃС‹Р»РєРё 8Р±РёС‚ + РґРІРµ РєРѕРјР°РЅРґС‹)
+//СЂР°Р·РјРµСЂ Р±СѓС„РµСЂР° РґР»СЏ РѕС‚СЂРёСЃРѕРІРєРё
 #define DMA_BUFFER_SIZE 		(DMA_BUFFER_POINTS*OP_SIZE)
 
 
 /* global vars */
-uint32_t DmaBuffer1[DMA_BUFFER_SIZE];//буфер1 для  ДМА
-uint32_t DmaBuffer2[DMA_BUFFER_SIZE];//буфер2 для  ДМА
+uint32_t DmaBuffer1[DMA_BUFFER_SIZE];//Р±СѓС„РµСЂ1 РґР»СЏ  Р”РњРђ
+uint32_t DmaBuffer2[DMA_BUFFER_SIZE];//Р±СѓС„РµСЂ2 РґР»СЏ  Р”РњРђ
 
 
 /* prots */
-//должны переехать отсюда, или нет...
+//РґРѕР»Р¶РЅС‹ РїРµСЂРµРµС…Р°С‚СЊ РѕС‚СЃСЋРґР°, РёР»Рё РЅРµС‚...
 void dmaInit();
 void dmaLoadBuffers();
 static inline void calcBufferSize(uint32_t *totalBufferSize, uint32_t *currentBufferSize,uint32_t MAX_SIZE);
@@ -27,7 +27,7 @@ static inline void dmaProcessing();
 static inline void dmaProcessingFull(uint32_t *buffer, uint32_t currentBufferSize);
 
 
-// вспомогательные функции внутри модуля
+// РІСЃРїРѕРјРѕРіР°С‚РµР»СЊРЅС‹Рµ С„СѓРЅРєС†РёРё РІРЅСѓС‚СЂРё РјРѕРґСѓР»СЏ
 static inline uint8_t drawCharacter(const char ch,uint16_t x, uint16_t y, DisplayColors_t color_front,DisplayColors_t color_back,const tFont* font);
 static inline uint8_t drawCharacter16(const char ch,uint16_t x, uint16_t y, uint16_t color_front,uint16_t color_back,const tFont* font);
 static inline uint32_t calcTotalBufferSize(uint16_t width,uint16_t height);
@@ -43,56 +43,56 @@ bool LCD_drawingIsBussy()
 /* code */
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-/* * * * * * * * * * * * * ПРЯМОУГОЛЬНИКИ * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * РџР РЇРњРћРЈР“РћР›Р¬РќРРљР * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-//16бит
+//16Р±РёС‚
 void LCD_drawFillOver16(uint16_t x1,uint16_t y1,uint16_t x2,uint16_t y2,uint16_t color)
 {
     DrawingIsBussy = true;
-    uint32_t totalBufferSize = calcTotalBufferSize((y2-y1),(x2-x1));//общий размер на отправку
-    uint32_t currentBufferSize = totalBufferSize > DMA_BUFFER_SIZE ? DMA_BUFFER_SIZE: totalBufferSize;//текущий пакет
+    uint32_t totalBufferSize = calcTotalBufferSize((y2-y1),(x2-x1));//РѕР±С‰РёР№ СЂР°Р·РјРµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ
+    uint32_t currentBufferSize = totalBufferSize > DMA_BUFFER_SIZE ? DMA_BUFFER_SIZE: totalBufferSize;//С‚РµРєСѓС‰РёР№ РїР°РєРµС‚
 
-    //подготовили буфер к отправке
+    //РїРѕРґРіРѕС‚РѕРІРёР»Рё Р±СѓС„РµСЂ Рє РѕС‚РїСЂР°РІРєРµ
     for (uint32_t i = 0; i < currentBufferSize; i += OP_SIZE)
     {
         DmaBuffer1[i] = BSRR_PREPARE_DATA |((color>>8)&0xFF);
         DmaBuffer1[i + 2] = BSRR_PREPARE_DATA | ((color)&0xFF);
     }
-    //подготовил дисплей к отрисовке
+    //РїРѕРґРіРѕС‚РѕРІРёР» РґРёСЃРїР»РµР№ Рє РѕС‚СЂРёСЃРѕРІРєРµ
     lcdSetArea(x1, x2, y1, y2);
 
-    //запустил дма в работу
-    while (totalBufferSize) //пока есть что отправлять
+    //Р·Р°РїСѓСЃС‚РёР» РґРјР° РІ СЂР°Р±РѕС‚Сѓ
+    while (totalBufferSize) //РїРѕРєР° РµСЃС‚СЊ С‡С‚Рѕ РѕС‚РїСЂР°РІР»СЏС‚СЊ
     {
-        //отправка данных
+        //РѕС‚РїСЂР°РІРєР° РґР°РЅРЅС‹С…
         dmaProcessingFull(DmaBuffer1, currentBufferSize);
-        //пересчитал размер буфера
+        //РїРµСЂРµСЃС‡РёС‚Р°Р» СЂР°Р·РјРµСЂ Р±СѓС„РµСЂР°
         calcBufferSize(&totalBufferSize,&currentBufferSize,DMA_BUFFER_SIZE);
     }
     DrawingIsBussy = false;
 }
-//8бит
+//8Р±РёС‚
 void LCD_drawFillOver(uint16_t x1,uint16_t y1,uint16_t x2,uint16_t y2,DisplayColors_t color)
 {
     DrawingIsBussy = true;
-	uint32_t totalBufferSize = calcTotalBufferSize((y2-y1),(x2-x1));//общий размер на отправку
-	uint32_t currentBufferSize = totalBufferSize > DMA_BUFFER_SIZE ? DMA_BUFFER_SIZE: totalBufferSize;//текущий пакет
+	uint32_t totalBufferSize = calcTotalBufferSize((y2-y1),(x2-x1));//РѕР±С‰РёР№ СЂР°Р·РјРµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ
+	uint32_t currentBufferSize = totalBufferSize > DMA_BUFFER_SIZE ? DMA_BUFFER_SIZE: totalBufferSize;//С‚РµРєСѓС‰РёР№ РїР°РєРµС‚
 
-	//подготовили буфер к отправке
+	//РїРѕРґРіРѕС‚РѕРІРёР»Рё Р±СѓС„РµСЂ Рє РѕС‚РїСЂР°РІРєРµ
 	for (uint32_t i = 0; i < currentBufferSize; i += OP_SIZE)
 	{
 		DmaBuffer1[i] =  table1_8_to_16[color];
 		DmaBuffer1[i + 2] =  table2_8_to_16[color];
 	}
-	//подготовил дисплей к отрисовке
+	//РїРѕРґРіРѕС‚РѕРІРёР» РґРёСЃРїР»РµР№ Рє РѕС‚СЂРёСЃРѕРІРєРµ
 	lcdSetArea(x1, x2, y1, y2);
 
-	//запустил дма в работу
-	while (totalBufferSize) //пока есть что отправлять
+	//Р·Р°РїСѓСЃС‚РёР» РґРјР° РІ СЂР°Р±РѕС‚Сѓ
+	while (totalBufferSize) //РїРѕРєР° РµСЃС‚СЊ С‡С‚Рѕ РѕС‚РїСЂР°РІР»СЏС‚СЊ
 	{
-		//отправка данных
+		//РѕС‚РїСЂР°РІРєР° РґР°РЅРЅС‹С…
 		dmaProcessingFull(DmaBuffer1, currentBufferSize);
-		//пересчитал размер буфера
+		//РїРµСЂРµСЃС‡РёС‚Р°Р» СЂР°Р·РјРµСЂ Р±СѓС„РµСЂР°
 		calcBufferSize(&totalBufferSize,&currentBufferSize,DMA_BUFFER_SIZE);
 	}
 	DrawingIsBussy = false;
@@ -100,7 +100,7 @@ void LCD_drawFillOver(uint16_t x1,uint16_t y1,uint16_t x2,uint16_t y2,DisplayCol
 void LCD_fillPrepareColor(DisplayColors_t color)
 {
     DrawingIsBussy = true;
-	//подготовили буфер
+	//РїРѕРґРіРѕС‚РѕРІРёР»Рё Р±СѓС„РµСЂ
 	for (uint32_t i = 0; i < DMA_BUFFER_SIZE; i += OP_SIZE)
 	{
 		DmaBuffer1[i] =  table1_8_to_16[color];
@@ -113,18 +113,18 @@ void LCD_fillPrepareColor(DisplayColors_t color)
 void LCD_drawFillWithPreparedColor(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 {
     DrawingIsBussy = true;
-	uint32_t totalBufferSize = calcTotalBufferSize((y2 - y1),(x2 - x1));//общий размер на отправку
-	uint32_t currentBufferSize = totalBufferSize > DMA_BUFFER_SIZE ?	DMA_BUFFER_SIZE : totalBufferSize;//текущий пакет
+	uint32_t totalBufferSize = calcTotalBufferSize((y2 - y1),(x2 - x1));//РѕР±С‰РёР№ СЂР°Р·РјРµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ
+	uint32_t currentBufferSize = totalBufferSize > DMA_BUFFER_SIZE ?	DMA_BUFFER_SIZE : totalBufferSize;//С‚РµРєСѓС‰РёР№ РїР°РєРµС‚
 
-	//подготовил дисплей к отисовке
+	//РїРѕРґРіРѕС‚РѕРІРёР» РґРёСЃРїР»РµР№ Рє РѕС‚РёСЃРѕРІРєРµ
 	lcdSetArea(x1, x2, y1, y2);
 
-	//запустил дма в работу
-	while (totalBufferSize) //пока есть что отправлять
+	//Р·Р°РїСѓСЃС‚РёР» РґРјР° РІ СЂР°Р±РѕС‚Сѓ
+	while (totalBufferSize) //РїРѕРєР° РµСЃС‚СЊ С‡С‚Рѕ РѕС‚РїСЂР°РІР»СЏС‚СЊ
 	{
-		//отправка данных
+		//РѕС‚РїСЂР°РІРєР° РґР°РЅРЅС‹С…
 		dmaProcessingFull(DmaBuffer1, currentBufferSize);
-		//пересчитал размер буфера
+		//РїРµСЂРµСЃС‡РёС‚Р°Р» СЂР°Р·РјРµСЂ Р±СѓС„РµСЂР°
 		calcBufferSize(&totalBufferSize,&currentBufferSize,DMA_BUFFER_SIZE);
 	}
 	DrawingIsBussy = false;
@@ -151,12 +151,12 @@ void LCD_drawRectFilled(uint16_t x,uint16_t y,uint16_t width,uint16_t height,Dis
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-/* * * * * * * * * * * * * ПИКСЕЛЬ * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * РџРРљРЎР•Р›Р¬ * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 void LCD_drawPixel(uint16_t x,uint16_t y,DisplayColors_t color)
 {
     DrawingIsBussy = true;
-	//подготовил дисплей к отрисовке
+	//РїРѕРґРіРѕС‚РѕРІРёР» РґРёСЃРїР»РµР№ Рє РѕС‚СЂРёСЃРѕРІРєРµ
 	lcdSetArea(x,x, y, y);
 
     LCD_D0_PORT->BSRR = table1_8_to_16[color];
@@ -168,7 +168,7 @@ void LCD_drawPixel(uint16_t x,uint16_t y,DisplayColors_t color)
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-/* * * * * * * * * * * * * ЛИНИИ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * Р›РРќРР * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 static inline void drawLineDiagonal(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1,DisplayColors_t color)
 {
@@ -217,15 +217,15 @@ static inline void drawLineDiagonal(uint16_t x0, uint16_t y0, uint16_t x1, uint1
 void LCD_drawLine(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, DisplayColors_t color)
 {
     DrawingIsBussy = true;
-	if (x1 == x2)	//вертикаль
+	if (x1 == x2)	//РІРµСЂС‚РёРєР°Р»СЊ
 	{
-		LCD_drawFillOver(x1, y1, x1 + 1, y2 + 1, color);//линия представлена в виде заливки опеределлного участка
+		LCD_drawFillOver(x1, y1, x1 + 1, y2 + 1, color);//Р»РёРЅРёСЏ РїСЂРµРґСЃС‚Р°РІР»РµРЅР° РІ РІРёРґРµ Р·Р°Р»РёРІРєРё РѕРїРµСЂРµРґРµР»Р»РЅРѕРіРѕ СѓС‡Р°СЃС‚РєР°
 	}
-	else if (y1 == y2)	//горизонталь
+	else if (y1 == y2)	//РіРѕСЂРёР·РѕРЅС‚Р°Р»СЊ
 	{
-		LCD_drawFillOver(x1, y1, x2 + 1, y1 + 1, color);//линия представлена в виде заливки опеределлного участка
+		LCD_drawFillOver(x1, y1, x2 + 1, y1 + 1, color);//Р»РёРЅРёСЏ РїСЂРµРґСЃС‚Р°РІР»РµРЅР° РІ РІРёРґРµ Р·Р°Р»РёРІРєРё РѕРїРµСЂРµРґРµР»Р»РЅРѕРіРѕ СѓС‡Р°СЃС‚РєР°
 	}
-	else	//любая другая прямая
+	else	//Р»СЋР±Р°СЏ РґСЂСѓРіР°СЏ РїСЂСЏРјР°СЏ
 	{
 		drawLineDiagonal(x1, y1, x2, y2, color);
 	}
@@ -234,9 +234,9 @@ void LCD_drawLine(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, DisplayCol
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-/* * * * * * * * * * * * * КАРТИНКИ * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * РљРђР РўРРќРљР * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-//получить значение точки в байте для монохромной картинки
+//РїРѕР»СѓС‡РёС‚СЊ Р·РЅР°С‡РµРЅРёРµ С‚РѕС‡РєРё РІ Р±Р°Р№С‚Рµ РґР»СЏ РјРѕРЅРѕС…СЂРѕРјРЅРѕР№ РєР°СЂС‚РёРЅРєРё
 static inline uint8_t imgMonoGetPix(uint8_t byte, uint8_t pos)
 {
 	return ((byte >> (7-pos))&0x01);//? 1:0;
@@ -247,26 +247,26 @@ void LCD_drawImgMono16(uint16_t x,uint16_t y,uint16_t color_front,uint16_t color
     uint16_t x2 = x+Image->width;// > LCD_WIDTH ? LCD_WIDTH : Image->width;
     uint16_t y2 = y+Image->height;// > LCD_HEIGHT ? LCD_HEIGHT : Image->height;
 
-    uint32_t totalBufferSize = calcTotalBufferSize((y2 - y), (x2 - x));//общий размер на отправку
-    uint32_t currentBufferSize = totalBufferSize > DMA_BUFFER_SIZE ? DMA_BUFFER_SIZE: totalBufferSize;//текущий размер пакета
+    uint32_t totalBufferSize = calcTotalBufferSize((y2 - y), (x2 - x));//РѕР±С‰РёР№ СЂР°Р·РјРµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ
+    uint32_t currentBufferSize = totalBufferSize > DMA_BUFFER_SIZE ? DMA_BUFFER_SIZE: totalBufferSize;//С‚РµРєСѓС‰РёР№ СЂР°Р·РјРµСЂ РїР°РєРµС‚Р°
 
-    uint32_t imageBufferIdx = 0;//индекс байта в буфере изображения
+    uint32_t imageBufferIdx = 0;//РёРЅРґРµРєСЃ Р±Р°Р№С‚Р° РІ Р±СѓС„РµСЂРµ РёР·РѕР±СЂР°Р¶РµРЅРёСЏ
 
 
-    ///подготовительные данные, чтобы не заниматься этим внутри циклов
-    uint32_t table1_ColorBack = BSRR_PREPARE_DATA |((color_back>>8)&0xFF);//цвет фона первых 8бит
-    uint32_t table2_ColorBack = BSRR_PREPARE_DATA | ((color_back)&0xFF);//цвет фона последних 8бит
+    ///РїРѕРґРіРѕС‚РѕРІРёС‚РµР»СЊРЅС‹Рµ РґР°РЅРЅС‹Рµ, С‡С‚РѕР±С‹ РЅРµ Р·Р°РЅРёРјР°С‚СЊСЃСЏ СЌС‚РёРј РІРЅСѓС‚СЂРё С†РёРєР»РѕРІ
+    uint32_t table1_ColorBack = BSRR_PREPARE_DATA |((color_back>>8)&0xFF);//С†РІРµС‚ С„РѕРЅР° РїРµСЂРІС‹С… 8Р±РёС‚
+    uint32_t table2_ColorBack = BSRR_PREPARE_DATA | ((color_back)&0xFF);//С†РІРµС‚ С„РѕРЅР° РїРѕСЃР»РµРґРЅРёС… 8Р±РёС‚
     uint32_t table1_ColorFront = BSRR_PREPARE_DATA |((color_front>>8)&0xFF);
     uint32_t table2_ColorFront = BSRR_PREPARE_DATA | ((color_front)&0xFF);
 
-    uint8_t imgByte = Image->data[imageBufferIdx];//получил первый байт картинки из массива
+    uint8_t imgByte = Image->data[imageBufferIdx];//РїРѕР»СѓС‡РёР» РїРµСЂРІС‹Р№ Р±Р°Р№С‚ РєР°СЂС‚РёРЅРєРё РёР· РјР°СЃСЃРёРІР°
 
-    uint16_t bitPos = 0;//позиция бита в байте
+    uint16_t bitPos = 0;//РїРѕР·РёС†РёСЏ Р±РёС‚Р° РІ Р±Р°Р№С‚Рµ
 
-    uint8_t dmaBufferNumb = 0;   //начинать с этого буфера
-    uint32_t *dmaBufferPointer;//указатель на массив ДМА
+    uint8_t dmaBufferNumb = 0;   //РЅР°С‡РёРЅР°С‚СЊ СЃ СЌС‚РѕРіРѕ Р±СѓС„РµСЂР°
+    uint32_t *dmaBufferPointer;//СѓРєР°Р·Р°С‚РµР»СЊ РЅР° РјР°СЃСЃРёРІ Р”РњРђ
 
-    //подготовил первый пакет
+    //РїРѕРґРіРѕС‚РѕРІРёР» РїРµСЂРІС‹Р№ РїР°РєРµС‚
     for (uint32_t i = 0; i < currentBufferSize; i += OP_SIZE)
     {
         if(imgMonoGetPix(imgByte,bitPos))
@@ -279,9 +279,9 @@ void LCD_drawImgMono16(uint16_t x,uint16_t y,uint16_t color_front,uint16_t color
             DmaBuffer1[i] =     table1_ColorBack;
             DmaBuffer1[i + 2] = table2_ColorBack;
         }
-        //DmaBuffer2 не заполнять, заполнится во время работы
+        //DmaBuffer2 РЅРµ Р·Р°РїРѕР»РЅСЏС‚СЊ, Р·Р°РїРѕР»РЅРёС‚СЃСЏ РІРѕ РІСЂРµРјСЏ СЂР°Р±РѕС‚С‹
 
-        {//пересчет позиций в буфере
+        {//РїРµСЂРµСЃС‡РµС‚ РїРѕР·РёС†РёР№ РІ Р±СѓС„РµСЂРµ
             bitPos++;
             if (bitPos == 8)
             {
@@ -292,27 +292,27 @@ void LCD_drawImgMono16(uint16_t x,uint16_t y,uint16_t color_front,uint16_t color
         }
     }
 
-    //подготовил дисплей к отрисовке
-    lcdSetArea(x, x2, y, y2);//Выставили область
+    //РїРѕРґРіРѕС‚РѕРІРёР» РґРёСЃРїР»РµР№ Рє РѕС‚СЂРёСЃРѕРІРєРµ
+    lcdSetArea(x, x2, y, y2);//Р’С‹СЃС‚Р°РІРёР»Рё РѕР±Р»Р°СЃС‚СЊ
 
-    while (totalBufferSize) //пока есть что отправлять
+    while (totalBufferSize) //РїРѕРєР° РµСЃС‚СЊ С‡С‚Рѕ РѕС‚РїСЂР°РІР»СЏС‚СЊ
     {
-        calcBufferSize(&totalBufferSize,&currentBufferSize,DMA_BUFFER_SIZE);//пересчитал размер буфера
-        dmaSetBufferSize(currentBufferSize);//установил новый размер на отправку по дма
+        calcBufferSize(&totalBufferSize,&currentBufferSize,DMA_BUFFER_SIZE);//РїРµСЂРµСЃС‡РёС‚Р°Р» СЂР°Р·РјРµСЂ Р±СѓС„РµСЂР°
+        dmaSetBufferSize(currentBufferSize);//СѓСЃС‚Р°РЅРѕРІРёР» РЅРѕРІС‹Р№ СЂР°Р·РјРµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ РїРѕ РґРјР°
 
-        if (dmaBufferNumb) //выбор буфера на отправку
+        if (dmaBufferNumb) //РІС‹Р±РѕСЂ Р±СѓС„РµСЂР° РЅР° РѕС‚РїСЂР°РІРєСѓ
         {
-            dmaSetBuffer(DmaBuffer2);//зарядил буфер на отправку
+            dmaSetBuffer(DmaBuffer2);//Р·Р°СЂСЏРґРёР» Р±СѓС„РµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ
             dmaBufferPointer =DmaBuffer1;
         }
         else
         {
-            dmaSetBuffer(DmaBuffer1);//зарядил буфер на отправку
+            dmaSetBuffer(DmaBuffer1);//Р·Р°СЂСЏРґРёР» Р±СѓС„РµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ
             dmaBufferPointer =DmaBuffer2;
         }
 
 
-        for (uint32_t i = 0; i < currentBufferSize; i += OP_SIZE) //подготовил новые данные
+        for (uint32_t i = 0; i < currentBufferSize; i += OP_SIZE) //РїРѕРґРіРѕС‚РѕРІРёР» РЅРѕРІС‹Рµ РґР°РЅРЅС‹Рµ
         {
 
             if(imgMonoGetPix(imgByte,bitPos))
@@ -326,7 +326,7 @@ void LCD_drawImgMono16(uint16_t x,uint16_t y,uint16_t color_front,uint16_t color
                 dmaBufferPointer[i + 2] = table2_ColorBack;
             }
 
-            {//пересчет позиций в буфере
+            {//РїРµСЂРµСЃС‡РµС‚ РїРѕР·РёС†РёР№ РІ Р±СѓС„РµСЂРµ
                 bitPos++;
                 if (bitPos == 8)
                 {
@@ -336,8 +336,8 @@ void LCD_drawImgMono16(uint16_t x,uint16_t y,uint16_t color_front,uint16_t color
                 }
             }
         }
-        dmaProcessing();                //ждем окончания отправки пакета
-        dmaBufferNumb = !dmaBufferNumb; //смена номера буфера
+        dmaProcessing();                //Р¶РґРµРј РѕРєРѕРЅС‡Р°РЅРёСЏ РѕС‚РїСЂР°РІРєРё РїР°РєРµС‚Р°
+        dmaBufferNumb = !dmaBufferNumb; //СЃРјРµРЅР° РЅРѕРјРµСЂР° Р±СѓС„РµСЂР°
 
     }
     DrawingIsBussy = false;
@@ -348,25 +348,25 @@ void LCD_drawImgMono(uint16_t x,uint16_t y,DisplayColors_t color_front,DisplayCo
 	uint16_t x2 = x+Image->width;// > LCD_WIDTH ? LCD_WIDTH : Image->width;
 	uint16_t y2 = y+Image->height;// > LCD_HEIGHT ? LCD_HEIGHT : Image->height;
 
-	uint32_t totalBufferSize = calcTotalBufferSize((y2 - y), (x2 - x));//общий размер на отправку
-	uint32_t currentBufferSize = totalBufferSize > DMA_BUFFER_SIZE ? DMA_BUFFER_SIZE: totalBufferSize;//текущий размер пакета
+	uint32_t totalBufferSize = calcTotalBufferSize((y2 - y), (x2 - x));//РѕР±С‰РёР№ СЂР°Р·РјРµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ
+	uint32_t currentBufferSize = totalBufferSize > DMA_BUFFER_SIZE ? DMA_BUFFER_SIZE: totalBufferSize;//С‚РµРєСѓС‰РёР№ СЂР°Р·РјРµСЂ РїР°РєРµС‚Р°
 
-	uint32_t imageBufferIdx = 0;//индекс байта в буфере изображения
+	uint32_t imageBufferIdx = 0;//РёРЅРґРµРєСЃ Р±Р°Р№С‚Р° РІ Р±СѓС„РµСЂРµ РёР·РѕР±СЂР°Р¶РµРЅРёСЏ
 
-	///подготовительные данные, чтобы не заниматься этим внутри циклов
-	uint32_t table1_ColorBack = table1_8_to_16[color_back];//цвет фона первых 8бит
-	uint32_t table2_ColorBack = table2_8_to_16[color_back];//цвет фона последних 8бит
+	///РїРѕРґРіРѕС‚РѕРІРёС‚РµР»СЊРЅС‹Рµ РґР°РЅРЅС‹Рµ, С‡С‚РѕР±С‹ РЅРµ Р·Р°РЅРёРјР°С‚СЊСЃСЏ СЌС‚РёРј РІРЅСѓС‚СЂРё С†РёРєР»РѕРІ
+	uint32_t table1_ColorBack = table1_8_to_16[color_back];//С†РІРµС‚ С„РѕРЅР° РїРµСЂРІС‹С… 8Р±РёС‚
+	uint32_t table2_ColorBack = table2_8_to_16[color_back];//С†РІРµС‚ С„РѕРЅР° РїРѕСЃР»РµРґРЅРёС… 8Р±РёС‚
 	uint32_t table1_ColorFront = table1_8_to_16[color_front];
 	uint32_t table2_ColorFront = table2_8_to_16[color_front];
 
-	uint8_t imgByte = Image->data[imageBufferIdx];//получил первый байт картинки из массива
+	uint8_t imgByte = Image->data[imageBufferIdx];//РїРѕР»СѓС‡РёР» РїРµСЂРІС‹Р№ Р±Р°Р№С‚ РєР°СЂС‚РёРЅРєРё РёР· РјР°СЃСЃРёРІР°
 
-	uint16_t bitPos = 0;//позиция бита в байте
+	uint16_t bitPos = 0;//РїРѕР·РёС†РёСЏ Р±РёС‚Р° РІ Р±Р°Р№С‚Рµ
 
-	uint8_t dmaBufferNumb = 0;   //начинать с этого буфера
-	uint32_t *dmaBufferPointer;//указатель на массив ДМА
+	uint8_t dmaBufferNumb = 0;   //РЅР°С‡РёРЅР°С‚СЊ СЃ СЌС‚РѕРіРѕ Р±СѓС„РµСЂР°
+	uint32_t *dmaBufferPointer;//СѓРєР°Р·Р°С‚РµР»СЊ РЅР° РјР°СЃСЃРёРІ Р”РњРђ
 
-	//подготовил первый пакет
+	//РїРѕРґРіРѕС‚РѕРІРёР» РїРµСЂРІС‹Р№ РїР°РєРµС‚
 	for (uint32_t i = 0; i < currentBufferSize; i += OP_SIZE)
 	{
 		if(imgMonoGetPix(imgByte,bitPos))
@@ -379,9 +379,9 @@ void LCD_drawImgMono(uint16_t x,uint16_t y,DisplayColors_t color_front,DisplayCo
 			DmaBuffer1[i] = 	table1_ColorBack;
 			DmaBuffer1[i + 2] = table2_ColorBack;
 		}
-		//DmaBuffer2 не заполнять, заполнится во время работы
+		//DmaBuffer2 РЅРµ Р·Р°РїРѕР»РЅСЏС‚СЊ, Р·Р°РїРѕР»РЅРёС‚СЃСЏ РІРѕ РІСЂРµРјСЏ СЂР°Р±РѕС‚С‹
 
-		{//пересчет позиций в буфере
+		{//РїРµСЂРµСЃС‡РµС‚ РїРѕР·РёС†РёР№ РІ Р±СѓС„РµСЂРµ
 			bitPos++;
 			if (bitPos == 8)
 			{
@@ -392,27 +392,27 @@ void LCD_drawImgMono(uint16_t x,uint16_t y,DisplayColors_t color_front,DisplayCo
 		}
 	}
 
-	//подготовил дисплей к отрисовке
-	lcdSetArea(x, x2, y, y2);//Выставили область
+	//РїРѕРґРіРѕС‚РѕРІРёР» РґРёСЃРїР»РµР№ Рє РѕС‚СЂРёСЃРѕРІРєРµ
+	lcdSetArea(x, x2, y, y2);//Р’С‹СЃС‚Р°РІРёР»Рё РѕР±Р»Р°СЃС‚СЊ
 
-	while (totalBufferSize) //пока есть что отправлять
+	while (totalBufferSize) //РїРѕРєР° РµСЃС‚СЊ С‡С‚Рѕ РѕС‚РїСЂР°РІР»СЏС‚СЊ
 	{
-		calcBufferSize(&totalBufferSize,&currentBufferSize,DMA_BUFFER_SIZE);//пересчитал размер буфера
-		dmaSetBufferSize(currentBufferSize);//установил новый размер на отправку по дма
+		calcBufferSize(&totalBufferSize,&currentBufferSize,DMA_BUFFER_SIZE);//РїРµСЂРµСЃС‡РёС‚Р°Р» СЂР°Р·РјРµСЂ Р±СѓС„РµСЂР°
+		dmaSetBufferSize(currentBufferSize);//СѓСЃС‚Р°РЅРѕРІРёР» РЅРѕРІС‹Р№ СЂР°Р·РјРµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ РїРѕ РґРјР°
 
-		if (dmaBufferNumb) //выбор буфера на отправку
+		if (dmaBufferNumb) //РІС‹Р±РѕСЂ Р±СѓС„РµСЂР° РЅР° РѕС‚РїСЂР°РІРєСѓ
 		{
-			dmaSetBuffer(DmaBuffer2);//зарядил буфер на отправку
+			dmaSetBuffer(DmaBuffer2);//Р·Р°СЂСЏРґРёР» Р±СѓС„РµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ
 			dmaBufferPointer =DmaBuffer1;
 		}
 		else
 		{
-			dmaSetBuffer(DmaBuffer1);//зарядил буфер на отправку
+			dmaSetBuffer(DmaBuffer1);//Р·Р°СЂСЏРґРёР» Р±СѓС„РµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ
 			dmaBufferPointer =DmaBuffer2;
 		}
 
 
-		for (uint32_t i = 0; i < currentBufferSize; i += OP_SIZE) //подготовил новые данные
+		for (uint32_t i = 0; i < currentBufferSize; i += OP_SIZE) //РїРѕРґРіРѕС‚РѕРІРёР» РЅРѕРІС‹Рµ РґР°РЅРЅС‹Рµ
 		{
 
 			if(imgMonoGetPix(imgByte,bitPos))
@@ -426,7 +426,7 @@ void LCD_drawImgMono(uint16_t x,uint16_t y,DisplayColors_t color_front,DisplayCo
 				dmaBufferPointer[i + 2] = table2_ColorBack;
 			}
 
-			{//пересчет позиций в буфере
+			{//РїРµСЂРµСЃС‡РµС‚ РїРѕР·РёС†РёР№ РІ Р±СѓС„РµСЂРµ
 				bitPos++;
 				if (bitPos == 8)
 				{
@@ -436,8 +436,8 @@ void LCD_drawImgMono(uint16_t x,uint16_t y,DisplayColors_t color_front,DisplayCo
 				}
 			}
 		}
-		dmaProcessing();				//ждем окончания отправки пакета
-		dmaBufferNumb = !dmaBufferNumb; //смена номера буфера
+		dmaProcessing();				//Р¶РґРµРј РѕРєРѕРЅС‡Р°РЅРёСЏ РѕС‚РїСЂР°РІРєРё РїР°РєРµС‚Р°
+		dmaBufferNumb = !dmaBufferNumb; //СЃРјРµРЅР° РЅРѕРјРµСЂР° Р±СѓС„РµСЂР°
 
 	}
 	DrawingIsBussy = false;
@@ -449,56 +449,56 @@ void LCD_drawImgBitmap(uint16_t x,uint16_t y,const tImage *Image)
 	uint16_t x2 = Image->width +x;
 	uint16_t y2 = Image->height+y;
 
-	uint32_t totalBufferSize = calcTotalBufferSize((y2 - y), (x2 - x));//общий размер на отправку
-	uint32_t currentBufferSize = totalBufferSize > DMA_BUFFER_SIZE ? DMA_BUFFER_SIZE: totalBufferSize;//текущий пакет
-	uint32_t imageBufferIdx = 0;//индекс байта в буфере изображения
+	uint32_t totalBufferSize = calcTotalBufferSize((y2 - y), (x2 - x));//РѕР±С‰РёР№ СЂР°Р·РјРµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ
+	uint32_t currentBufferSize = totalBufferSize > DMA_BUFFER_SIZE ? DMA_BUFFER_SIZE: totalBufferSize;//С‚РµРєСѓС‰РёР№ РїР°РєРµС‚
+	uint32_t imageBufferIdx = 0;//РёРЅРґРµРєСЃ Р±Р°Р№С‚Р° РІ Р±СѓС„РµСЂРµ РёР·РѕР±СЂР°Р¶РµРЅРёСЏ
 
-	uint8_t dmaBufferNumb = 0;   //начинать с этого буфера
-	uint32_t *dmaBufferPointer;//указатель на массив ДМА
+	uint8_t dmaBufferNumb = 0;   //РЅР°С‡РёРЅР°С‚СЊ СЃ СЌС‚РѕРіРѕ Р±СѓС„РµСЂР°
+	uint32_t *dmaBufferPointer;//СѓРєР°Р·Р°С‚РµР»СЊ РЅР° РјР°СЃСЃРёРІ Р”РњРђ
 
 
-//подготовил первый пакет
+//РїРѕРґРіРѕС‚РѕРІРёР» РїРµСЂРІС‹Р№ РїР°РєРµС‚
 	for (uint32_t i = 0; i < currentBufferSize; i += OP_SIZE)
 	{
 		DmaBuffer1[i] = table1_8_to_16[Image->data[imageBufferIdx]];
 		DmaBuffer1[i + 2] = table2_8_to_16[Image->data[imageBufferIdx]];
 		imageBufferIdx++;
 	}
-	//подготовил дисплей к отрисовке
+	//РїРѕРґРіРѕС‚РѕРІРёР» РґРёСЃРїР»РµР№ Рє РѕС‚СЂРёСЃРѕРІРєРµ
 	lcdSetArea(x, x2, y, y2);
 
-	while (totalBufferSize) //пока есть что отправлять
+	while (totalBufferSize) //РїРѕРєР° РµСЃС‚СЊ С‡С‚Рѕ РѕС‚РїСЂР°РІР»СЏС‚СЊ
 	{
-		calcBufferSize(&totalBufferSize,&currentBufferSize,DMA_BUFFER_SIZE);//пересчитал размер буфера
-		dmaSetBufferSize(currentBufferSize);//установил новый размер на отправку по дма
+		calcBufferSize(&totalBufferSize,&currentBufferSize,DMA_BUFFER_SIZE);//РїРµСЂРµСЃС‡РёС‚Р°Р» СЂР°Р·РјРµСЂ Р±СѓС„РµСЂР°
+		dmaSetBufferSize(currentBufferSize);//СѓСЃС‚Р°РЅРѕРІРёР» РЅРѕРІС‹Р№ СЂР°Р·РјРµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ РїРѕ РґРјР°
 
-		if (dmaBufferNumb) //выбор буфера на отправку
+		if (dmaBufferNumb) //РІС‹Р±РѕСЂ Р±СѓС„РµСЂР° РЅР° РѕС‚РїСЂР°РІРєСѓ
 		{
-			dmaSetBuffer(DmaBuffer2);//зарядил буфер на отправку
+			dmaSetBuffer(DmaBuffer2);//Р·Р°СЂСЏРґРёР» Р±СѓС„РµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ
 			dmaBufferPointer =DmaBuffer1;
 		}
 		else
 		{
-			dmaSetBuffer(DmaBuffer1);//зарядил буфер на отправку
+			dmaSetBuffer(DmaBuffer1);//Р·Р°СЂСЏРґРёР» Р±СѓС„РµСЂ РЅР° РѕС‚РїСЂР°РІРєСѓ
 			dmaBufferPointer =DmaBuffer2;
 		}
-		for (uint32_t i = 0; i < currentBufferSize; i += OP_SIZE) //подготовил новые данные
+		for (uint32_t i = 0; i < currentBufferSize; i += OP_SIZE) //РїРѕРґРіРѕС‚РѕРІРёР» РЅРѕРІС‹Рµ РґР°РЅРЅС‹Рµ
 		{
 			dmaBufferPointer[i] = table1_8_to_16[Image->data[imageBufferIdx]];
 			dmaBufferPointer[i + 2] = table2_8_to_16[Image->data[imageBufferIdx]];
 			imageBufferIdx++;
 		}
-		dmaProcessing();				//ждем окончания отправки пакета
-		dmaBufferNumb = !dmaBufferNumb; //смена номера буфера
+		dmaProcessing();				//Р¶РґРµРј РѕРєРѕРЅС‡Р°РЅРёСЏ РѕС‚РїСЂР°РІРєРё РїР°РєРµС‚Р°
+		dmaBufferNumb = !dmaBufferNumb; //СЃРјРµРЅР° РЅРѕРјРµСЂР° Р±СѓС„РµСЂР°
 	}
 	DrawingIsBussy = false;
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-/* * * * * * * * * * * * * ТЕКСТ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * РўР•РљРЎРў * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 #include "string.h"
-#define SPEC_LF 10// адрес символа переноса строки /n
+#define SPEC_LF 10// Р°РґСЂРµСЃ СЃРёРјРІРѕР»Р° РїРµСЂРµРЅРѕСЃР° СЃС‚СЂРѕРєРё /n
 
 void LCD_text16(const char *str, uint16_t x, uint16_t y, uint16_t color_front, uint16_t color_back, const tFont *font)
 {
@@ -508,28 +508,28 @@ void LCD_text16(const char *str, uint16_t x, uint16_t y, uint16_t color_front, u
 
     uint16_t strSize = strlen(str);
 
-    /*ограничения по размерам выводимых сиволов */
+    /*РѕРіСЂР°РЅРёС‡РµРЅРёСЏ РїРѕ СЂР°Р·РјРµСЂР°Рј РІС‹РІРѕРґРёРјС‹С… СЃРёРІРѕР»РѕРІ */
     uint16_t maxWidth = LCD_WIDTH - 1;
     uint16_t maxHeight = LCD_HEIGHT - 1;
 
-    //по каждому симолву в строке
+    //РїРѕ РєР°Р¶РґРѕРјСѓ СЃРёРјРѕР»РІСѓ РІ СЃС‚СЂРѕРєРµ
     for (uint16_t i = 0; i < strSize; i++)
     {
-        if (str[i] == SPEC_LF)//если перенос строки
+        if (str[i] == SPEC_LF)//РµСЃР»Рё РїРµСЂРµРЅРѕСЃ СЃС‚СЂРѕРєРё
         {
             posY += font->height;
             posX = x;
         }
-        else//иначе символ
+        else//РёРЅР°С‡Рµ СЃРёРјРІРѕР»
         {
-            posX += drawCharacter16(str[i], posX, posY, color_front, color_back,font);//рисовка символа
-            if (posX > maxWidth)//если конец строки
+            posX += drawCharacter16(str[i], posX, posY, color_front, color_back,font);//СЂРёСЃРѕРІРєР° СЃРёРјРІРѕР»Р°
+            if (posX > maxWidth)//РµСЃР»Рё РєРѕРЅРµС† СЃС‚СЂРѕРєРё
             {
                 posX = x;
-                posY += font->height;//переход на новую
+                posY += font->height;//РїРµСЂРµС…РѕРґ РЅР° РЅРѕРІСѓСЋ
             }
         }
-        if (posY > maxHeight)//если конец по высоте - выход
+        if (posY > maxHeight)//РµСЃР»Рё РєРѕРЅРµС† РїРѕ РІС‹СЃРѕС‚Рµ - РІС‹С…РѕРґ
             return;
     }
     DrawingIsBussy = false;
@@ -544,28 +544,28 @@ void LCD_text(const char *str, uint16_t x, uint16_t y, DisplayColors_t color_fro
 
 	uint16_t strSize = strlen(str);
 
-	/*ограничения по размерам выводимых сиволов */
+	/*РѕРіСЂР°РЅРёС‡РµРЅРёСЏ РїРѕ СЂР°Р·РјРµСЂР°Рј РІС‹РІРѕРґРёРјС‹С… СЃРёРІРѕР»РѕРІ */
 	uint16_t maxWidth = LCD_WIDTH - 1;
 	uint16_t maxHeight = LCD_HEIGHT - 1;
 
-	//по каждому симолву в строке
+	//РїРѕ РєР°Р¶РґРѕРјСѓ СЃРёРјРѕР»РІСѓ РІ СЃС‚СЂРѕРєРµ
 	for (uint16_t i = 0; i < strSize; i++)
 	{
-		if (str[i] == SPEC_LF)//если перенос строки
+		if (str[i] == SPEC_LF)//РµСЃР»Рё РїРµСЂРµРЅРѕСЃ СЃС‚СЂРѕРєРё
 		{
 			posY += font->height;
 			posX = x;
 		}
-		else//иначе символ
+		else//РёРЅР°С‡Рµ СЃРёРјРІРѕР»
 		{
-			posX += drawCharacter(str[i], posX, posY, color_front, color_back,font);//рисовка символа
-			if (posX > maxWidth)//если конец строки
+			posX += drawCharacter(str[i], posX, posY, color_front, color_back,font);//СЂРёСЃРѕРІРєР° СЃРёРјРІРѕР»Р°
+			if (posX > maxWidth)//РµСЃР»Рё РєРѕРЅРµС† СЃС‚СЂРѕРєРё
 			{
 				posX = x;
-				posY += font->height;//переход на новую
+				posY += font->height;//РїРµСЂРµС…РѕРґ РЅР° РЅРѕРІСѓСЋ
 			}
 		}
-		if (posY > maxHeight)//если конец по высоте - выход
+		if (posY > maxHeight)//РµСЃР»Рё РєРѕРЅРµС† РїРѕ РІС‹СЃРѕС‚Рµ - РІС‹С…РѕРґ
 			return;
 	}
 	DrawingIsBussy = false;
@@ -573,7 +573,7 @@ void LCD_text(const char *str, uint16_t x, uint16_t y, DisplayColors_t color_fro
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-/* * * * * * * * * * * * * СИСТЕМНЫЕ * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+/* * * * * * * * * * * * * РЎРРЎРўР•РњРќР«Р• * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 void LCD_init()
 {
@@ -588,7 +588,7 @@ void LCD_init()
 	LL_mDelay(12);
 	dmaInit();
 
-	dmaLoadBuffers();//предподготовка значений в буфере
+	dmaLoadBuffers();//РїСЂРµРґРїРѕРґРіРѕС‚РѕРІРєР° Р·РЅР°С‡РµРЅРёР№ РІ Р±СѓС„РµСЂРµ
 }
 
 void LCD_deinit()
@@ -600,21 +600,21 @@ void LCD_deinit()
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 uint8_t LightingIntencity = 0;
-// проверить по факту
-#define TIMEOUT_80US 3000//частота шины 32Mhz, значит 1/32Mhz * 3000 = 93uS должно хватить.
+// РїСЂРѕРІРµСЂРёС‚СЊ РїРѕ С„Р°РєС‚Сѓ
+#define TIMEOUT_80US 3000//С‡Р°СЃС‚РѕС‚Р° С€РёРЅС‹ 32Mhz, Р·РЅР°С‡РёС‚ 1/32Mhz * 3000 = 93uS РґРѕР»Р¶РЅРѕ С…РІР°С‚РёС‚СЊ.
 volatile uint16_t LightHiIntesTimeout = 0;
 
 void LCD_setLightningIntencity(uint8_t percent)
 {
-    //если текущий уровень яркости 0, и пришло новое задание яркости
+    //РµСЃР»Рё С‚РµРєСѓС‰РёР№ СѓСЂРѕРІРµРЅСЊ СЏСЂРєРѕСЃС‚Рё 0, Рё РїСЂРёС€Р»Рѕ РЅРѕРІРѕРµ Р·Р°РґР°РЅРёРµ СЏСЂРєРѕСЃС‚Рё
     if((LightingIntencity == 0)&& (LightingIntencity!=percent))
     {
-        //зарядить на 80мкс шим в 100%
+        //Р·Р°СЂСЏРґРёС‚СЊ РЅР° 80РјРєСЃ С€РёРј РІ 100%
         PWM_setLightningPWMwidth(1);//percent to float
         PWM_processing();
         LightHiIntesTimeout = TIMEOUT_80US;
         while(--LightHiIntesTimeout);
-       // LL_mDelay(1000);//проверка что работает
+       // LL_mDelay(1000);//РїСЂРѕРІРµСЂРєР° С‡С‚Рѕ СЂР°Р±РѕС‚Р°РµС‚
     }
 	if(percent > 100)percent = 100;
 	LightingIntencity = percent;
@@ -630,55 +630,55 @@ uint8_t  LCD_getLightningIntencity()
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// вспомогательные функции
+// РІСЃРїРѕРјРѕРіР°С‚РµР»СЊРЅС‹Рµ С„СѓРЅРєС†РёРё
 
-#define SYMBOLS_TABLE_SHIFT 32 //сдвиг в таблице кодировки, т.к. первые 32 символа не храним в таблице шрифта
-//рисовка одного символа
+#define SYMBOLS_TABLE_SHIFT 32 //СЃРґРІРёРі РІ С‚Р°Р±Р»РёС†Рµ РєРѕРґРёСЂРѕРІРєРё, С‚.Рє. РїРµСЂРІС‹Рµ 32 СЃРёРјРІРѕР»Р° РЅРµ С…СЂР°РЅРёРј РІ С‚Р°Р±Р»РёС†Рµ С€СЂРёС„С‚Р°
+//СЂРёСЃРѕРІРєР° РѕРґРЅРѕРіРѕ СЃРёРјРІРѕР»Р°
 
 static inline uint8_t getSymbol(const char ch)
 {
-	//если символ из диапазона непечатаемых 0-32
+	//РµСЃР»Рё СЃРёРјРІРѕР» РёР· РґРёР°РїР°Р·РѕРЅР° РЅРµРїРµС‡Р°С‚Р°РµРјС‹С… 0-32
 	if (ch < SYMBOLS_TABLE_SHIFT)
-		return 0; // заменяем пробелом
+		return 0; // Р·Р°РјРµРЅСЏРµРј РїСЂРѕР±РµР»РѕРј
 	else
-		return ch - SYMBOLS_TABLE_SHIFT; //иначе вернули символ
+		return ch - SYMBOLS_TABLE_SHIFT; //РёРЅР°С‡Рµ РІРµСЂРЅСѓР»Рё СЃРёРјРІРѕР»
 }
 static inline uint8_t drawCharacter(const char ch,uint16_t x, uint16_t y, DisplayColors_t color_front,DisplayColors_t color_back,const tFont* font)
 {
 
     const tImage *image = font->chars[getSymbol(ch)].image;
 
-    LCD_drawImgMono(x, y, color_front, color_back, image); //символы рисуем как монокартинки
+    LCD_drawImgMono(x, y, color_front, color_back, image); //СЃРёРјРІРѕР»С‹ СЂРёСЃСѓРµРј РєР°Рє РјРѕРЅРѕРєР°СЂС‚РёРЅРєРё
     return image->width;
 }
 static inline uint8_t drawCharacter16(const char ch,uint16_t x, uint16_t y, uint16_t color_front,uint16_t color_back,const tFont* font)
 {
     const tImage *image = font->chars[getSymbol(ch)].image;
-    LCD_drawImgMono16(x, y, color_front, color_back, image); //символы рисуем как монокартинки
+    LCD_drawImgMono16(x, y, color_front, color_back, image); //СЃРёРјРІРѕР»С‹ СЂРёСЃСѓРµРј РєР°Рє РјРѕРЅРѕРєР°СЂС‚РёРЅРєРё
     return image->width;
 }
 
 static inline uint32_t calcTotalBufferSize(uint16_t width,uint16_t height)
 {
-	return OP_SIZE *width * height;//полная длина буфера изображения//4*240*320;//
+	return OP_SIZE *width * height;//РїРѕР»РЅР°СЏ РґР»РёРЅР° Р±СѓС„РµСЂР° РёР·РѕР±СЂР°Р¶РµРЅРёСЏ//4*240*320;//
 }
 static inline void lcdSetArea(uint16_t x1,uint16_t x2,uint16_t y1,uint16_t y2)
 {
-	St7789_setArea(x1, x2-1, y1, y2-1);//Выставили область
-	St7789_startData();//разрешение на отправку буфера
+	St7789_setArea(x1, x2-1, y1, y2-1);//Р’С‹СЃС‚Р°РІРёР»Рё РѕР±Р»Р°СЃС‚СЊ
+	St7789_startData();//СЂР°Р·СЂРµС€РµРЅРёРµ РЅР° РѕС‚РїСЂР°РІРєСѓ Р±СѓС„РµСЂР°
 }
 
-/* перерасчет общей длины и текущей длины на отправку */
+/* РїРµСЂРµСЂР°СЃС‡РµС‚ РѕР±С‰РµР№ РґР»РёРЅС‹ Рё С‚РµРєСѓС‰РµР№ РґР»РёРЅС‹ РЅР° РѕС‚РїСЂР°РІРєСѓ */
 static inline void calcBufferSize(uint32_t *totalBufferSize, uint32_t *currentBufferSize,uint32_t MAX_SIZE)
 {
-	*currentBufferSize = *totalBufferSize > MAX_SIZE ? MAX_SIZE : *totalBufferSize;		//текущий пакет
+	*currentBufferSize = *totalBufferSize > MAX_SIZE ? MAX_SIZE : *totalBufferSize;		//С‚РµРєСѓС‰РёР№ РїР°РєРµС‚
 	*totalBufferSize -= *currentBufferSize;
 }
 
 
-// функции работы с ДМА. которые должны отсюда съехать
+// С„СѓРЅРєС†РёРё СЂР°Р±РѕС‚С‹ СЃ Р”РњРђ. РєРѕС‚РѕСЂС‹Рµ РґРѕР»Р¶РЅС‹ РѕС‚СЃСЋРґР° СЃСЉРµС…Р°С‚СЊ
 
-/* перешел на дефайны для канала и флагов для удобного перехода на любой ДМА и канал*/
+/* РїРµСЂРµС€РµР» РЅР° РґРµС„Р°Р№РЅС‹ РґР»СЏ РєР°РЅР°Р»Р° Рё С„Р»Р°РіРѕРІ РґР»СЏ СѓРґРѕР±РЅРѕРіРѕ РїРµСЂРµС…РѕРґР° РЅР° Р»СЋР±РѕР№ Р”РњРђ Рё РєР°РЅР°Р»*/
 #define DMAx 					DMA2
 #define DMAx_CHANNELy 			DMA2_Channel5
 #define DMA_IS_ACTIVE_FLAG_TC 	LL_DMA_IsActiveFlag_TC5
@@ -704,27 +704,27 @@ void dmaLoadBuffers()
 }
 
 
-/* выставление новой длины пакета для отправки по ДМА */
+/* РІС‹СЃС‚Р°РІР»РµРЅРёРµ РЅРѕРІРѕР№ РґР»РёРЅС‹ РїР°РєРµС‚Р° РґР»СЏ РѕС‚РїСЂР°РІРєРё РїРѕ Р”РњРђ */
 static inline void dmaSetBufferSize(uint32_t currentBufferSize)
 {
 	DMAx_CHANNELy->CCR &= (uint16_t) (~DMA_CCR_EN); //disable DMA
 	DMAx_CHANNELy->CNDTR = currentBufferSize; //set buf size
 }
 
-/* смена источника для ДМА */
+/* СЃРјРµРЅР° РёСЃС‚РѕС‡РЅРёРєР° РґР»СЏ Р”РњРђ */
 static inline void dmaSetBuffer(uint32_t *buffer)
 {
 	DMAx_CHANNELy->CPAR = (uint32_t) buffer; //set buff
 	DMAx_CHANNELy->CCR |= DMA_CCR_EN; //enable DMA
 }
-/* ождиание конца отправки ДМА*/
+/* РѕР¶РґРёР°РЅРёРµ РєРѕРЅС†Р° РѕС‚РїСЂР°РІРєРё Р”РњРђ*/
 static inline void dmaProcessing()
 {
 	while (!(DMA_IS_ACTIVE_FLAG_TC(DMAx)))
 		;
 	DMA_CLEAR_FLAG_TC(DMAx); //reset flag
 }
-/* полный набор действий с ДМА */
+/* РїРѕР»РЅС‹Р№ РЅР°Р±РѕСЂ РґРµР№СЃС‚РІРёР№ СЃ Р”РњРђ */
 static inline void dmaProcessingFull(uint32_t *buffer, uint32_t currentBufferSize)
 {
 	//DMA1_Channel1->CCR &= (uint16_t) (~DMA_CCR_EN); //disable DMA
